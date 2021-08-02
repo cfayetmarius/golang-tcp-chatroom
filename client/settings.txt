@@ -1,0 +1,2 @@
+#This is the settings file of OLC client
+defaultnick:John_Galt
