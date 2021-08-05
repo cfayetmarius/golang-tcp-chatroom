@@ -1,0 +1,2 @@
+#The list of blacklisted IP from the server
+255.255.255.255

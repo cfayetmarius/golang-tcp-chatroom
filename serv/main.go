@@ -33,11 +33,18 @@ func getln(port string) net.Listener{
 	return(ln)
 }
 
-func getconn(ln net.Listener) net.Conn{
+func getconn(ln net.Listener, bl []string) net.Conn{
 	conn, err := ln.Accept()
 	if err != nil {
 		fmt.Printf("Error trying to accept a connection, listening will continue : \n"+err.Error()+"\n")
 	}
+	for _, ip := range bl {
+		if ip == strings.Split(conn.RemoteAddr().String(),":")[0] {
+			fmt.Println("This IP has been blacklisted : "+strings.Split(conn.RemoteAddr().String(),":")[0])
+			conn.Close()
+			return(nil)
+		}
+	} 
 	return(conn)
 }
 
@@ -47,6 +54,22 @@ func getdir() string {
 		fmt.Printf("Error trying to import directory : \n"+err.Error())
 	}
 	return(dir)
+}
+
+func getbl(path string) []string {
+	var bl []string 
+	file, err:= os.Open(path)
+	if err != nil {
+		log.Fatal("Failed opening the settings file :\n%s",err)
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		if string(scanner.Text()[0]) != "#" {
+			bl = append(bl, scanner.Text())		
+		}
+	}
+	return bl
 }
 
 func getsettings(path string)map[string]string{
@@ -194,6 +217,7 @@ func changenick(m *member, name string, dic *map[net.Conn]*member) {
 }
 
 func main() {
+	bl := getbl("blacklist.txt")
 	commchan := make(chan message)
 	conndic := make(map[net.Conn]*member)
 	fmt.Println("[*] Server started : "+time.Now().Format("02/01 03:04:05"))
@@ -203,12 +227,14 @@ func main() {
 	go handlemsg(commchan, conndic)
 	var i int 
 	for len(mlist) <= atoi(setts["MAX_MEMBER"]) {
-		conn := getconn(ln)
-		addmember(member{conn:conn,nick:"member_"+strconv.Itoa(i)},&mlist)
-		i++
-		conndic[conn] = *(&mlist[len(mlist)-1])
-		fmt.Printf("New user joined the room ("+conn.RemoteAddr().String()+")\n")
-		go newchatter(message{author : member{}, text : "SERVER MESSAGE : a new member has joined the chat : "+mlist[len(mlist)-1].nick+"\n", timestamp : time.Now().Format("03:04:05")},*(mlist[len(mlist)-1]),&mlist,conndic)
-		go getfrom(commchan, conn, conndic)
+		conn := getconn(ln, bl)
+		if conn != nil {
+			addmember(member{conn:conn,nick:"member_"+strconv.Itoa(i)},&mlist)
+			i++
+			conndic[conn] = *(&mlist[len(mlist)-1])
+			fmt.Printf("New user joined the room ("+conn.RemoteAddr().String()+")\n")
+			go newchatter(message{author : member{}, text : "SERVER MESSAGE : a new member has joined the chat : "+mlist[len(mlist)-1].nick+"\n", timestamp : time.Now().Format("03:04:05")},*(mlist[len(mlist)-1]),&mlist,conndic)
+			go getfrom(commchan, conn, conndic)
+		}
 	}
 }
