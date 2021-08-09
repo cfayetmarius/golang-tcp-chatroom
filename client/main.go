@@ -10,17 +10,23 @@ import(
 	"bufio"
 ) 
 
-var setts map[string]string =  getsettings("settings.txt")
+var (
+	setts map[string]string =  getsettings("settings.txt")
+	servname string
+)
 
 //removing an element from a slice
 func remove(slice []string, s int) []string {
     return append(slice[:s], slice[s+1:]...)
 }
 
-
 //a func to check if a pseudo is right or not
 func checknick(nick string) {
 	nick = nick[:(len(nick)-2)]
+	if nick == "SERVER" {
+		fmt.Println("Dont try to spoof server")
+		return
+	}
 	authorized := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
 	if len(nick) <= 4 || len(nick) >= 16 {
 		log.Fatal("Your nickname might contain between 4 and 16 characters. To get help about how the client works, type client.exe /help\n")
@@ -30,6 +36,7 @@ func checknick(nick string) {
 			log.Fatal("Something happens with '"+string(nick[i])+"'\nYour nickname might contain only characters "+authorized)
 		}
 	}
+	fmt.Println("Valid name\n")
 }
 
 
@@ -79,6 +86,7 @@ func contains(s []string, str string) bool {
 	return false
 }
 
+//printing help 
 func helpfunc() {
 	log.Fatal("Welcome to the client of olc tcp chatroom.\nTo use this client is pretty easy just type :\n'client.exe <IP> <PORT>'\nWhere IP is an IPV4 adress and PORT is a valid port. Olc servers usually run on port 9000, at least it is the default port.\nOnce you are connected to a room, a nickname like member_12 is given to you.\nTo change your nickanme in the room just type (once you are connected to it) :\n/nick <nickname>\nWhere nickname is between 4 and 16 characters and only contains 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_'\nIf you want to nick automatically just type :\n/nick\nAnd the room will give you your default nickname (which one you can modify in the settings.txt). By default, your default nickname might be John_Galt.\nTo get some help type client.exe help.\nFor more information feel free to contact me. ")
 }
@@ -127,9 +135,8 @@ func getinpt(c chan string) {
 		if len(text) >= 5 {
 			if text[:5] == "/nick" {
 				if len(text) > 7 {
-					fmt.Printf("Checking for nickname "+text[6:(len(text)-2)]+"...")
+					fmt.Printf("Checking for nickname '"+text[6:(len(text)-2)]+"'...")
 					checknick(text[6:])
-					fmt.Printf(" Valid name\n")
 				} else {
 					fmt.Printf("Checking for nickname "+setts["defaultnick"]+"...")
 					text = "/nick " + setts["defaultnick"]
@@ -156,7 +163,8 @@ func main() {
 	var msg string
 	for {
 		msg = <- outing
-		_, err := conn.Write([]byte(msg+"    \n"))
+		fmt.Println("sending",msg)
+		_, err := conn.Write([]byte(msg+"   \n"))
 		if err != nil {
 			log.Fatal("Cannot reach the server ("+conn.RemoteAddr().String()+")")
 		}

@@ -40,7 +40,6 @@ func getconn(ln net.Listener, bl []string) net.Conn{
 	}
 	for _, ip := range bl {
 		if ip == strings.Split(conn.RemoteAddr().String(),":")[0] {
-			fmt.Println("This IP has been blacklisted : "+strings.Split(conn.RemoteAddr().String(),":")[0])
 			conn.Close()
 			return(nil)
 		}
@@ -88,7 +87,6 @@ func getsettings(path string)map[string]string{
 	return(params)
 }
 
-
 func atoi(s string) int{
 	i, err := strconv.Atoi(s)
 	if err != nil {
@@ -114,7 +112,7 @@ func getfrom(c chan message, conn net.Conn,dic map[net.Conn]*member) {
 }
 
 func sendmember(m  member, msg message, dic map[net.Conn]*member) {
-	_, err := m.conn.Write([]byte(msg.timestamp+"@"+msg.author.nick+" : "+msg.text))
+	_, err := m.conn.Write([]byte(msg.timestamp+"#"+setts["NAME"]+"@"+msg.author.nick+" : "+msg.text))
 	if err != nil {
 		fmt.Println("Unreachable member : ",m.conn.RemoteAddr().String())
 		delconn(dic, &mlist, m.conn)
@@ -164,8 +162,7 @@ func newchatter(msg message, m member, ml *[]*member, dic map[net.Conn]*member) 
 func handlemsg(c chan message, dic map[net.Conn]*member) {
 	for {
 		msg := <- c
-		fmt.Println(msg.text,len(msg.text))
-		t := msg.text[:len(msg.text)-2]+"     "
+		t := msg.text+"    "
 		switch t[:5] {
 		case "/list" :
 			sendlist(dic,msg.author)
@@ -191,28 +188,30 @@ func ispseudalready(name string) bool {
 }
 
 func changenick(m *member, name string, dic *map[net.Conn]*member) {
-	for i, iter := range mlist {
-		if *m == *iter {
-			var adding string = ""
-			if ispseudalready(name) {
-				adding = "bis"
-				fmt.Println("User "+(*m).nick+" tried to change his nick for "+name+" but it was already taken, adding a 'bis'")
-				sendmember(*m,message{author : member{}, text : "Someone here already has this nickname so we added a 'bis' after. Type /list to see all nicknames in the room\n", timestamp : time.Now().Format("03:04:05")}, *dic)
-			}
-			fmt.Println("adding is ",adding)
-			old := (*m).nick
-			name = strings.ReplaceAll(name,"\n","")+adding
-			fmt.Printf("User "+old+" changed his nick for ")
-			mlist[i] = &member{conn : (*m).conn, nick : name}
-			(*dic)[(*m).conn] = &member{conn : (*m).conn, nick : name}
-			new := (*dic)[(*m).conn].nick
-			fmt.Printf(new+"\n")
-			for _, recv := range mlist {
-				if *recv != *m {
-					sendmember(*recv,message{author : member{}, text : old+" changed his nickname for "+new+"\n", timestamp : time.Now().Format("03:04:05")}, *dic)
+	if name != "SERVER" {
+		for i, iter := range mlist {
+			if *m == *iter {
+				var adding string = ""
+				if ispseudalready(name) {
+					adding = "bis"
+					fmt.Println("User "+(*m).nick+" tried to change his nick for "+name+" but it was already taken, adding a 'bis'")
+					sendmember(*m,message{author : member{}, text : "Someone here already has this nickname so we added a 'bis' after. Type /list to see all nicknames in the room\n", timestamp : time.Now().Format("03:04:05")}, *dic)
 				}
-			}
-		}		  
+				fmt.Println("adding is ",adding)
+				old := (*m).nick
+				name = strings.ReplaceAll(name,"\n","")+adding
+				fmt.Printf("User "+old+" changed his nick for ")
+				mlist[i] = &member{conn : (*m).conn, nick : name}
+				(*dic)[(*m).conn] = &member{conn : (*m).conn, nick : name}
+				new := (*dic)[(*m).conn].nick
+				fmt.Printf(new+"\n")
+				for _, recv := range mlist {
+					if *recv != *m {
+						sendmember(*recv,message{author : member{nick : "SERVER"}, text : old+" changed his nickname for "+new+"\n", timestamp : time.Now().Format("03:04:05")}, *dic)
+					}
+				}
+			}		  
+		}
 	}
 }
 
@@ -233,7 +232,7 @@ func main() {
 			i++
 			conndic[conn] = *(&mlist[len(mlist)-1])
 			fmt.Printf("New user joined the room ("+conn.RemoteAddr().String()+")\n")
-			go newchatter(message{author : member{}, text : "SERVER MESSAGE : a new member has joined the chat : "+mlist[len(mlist)-1].nick+"\n", timestamp : time.Now().Format("03:04:05")},*(mlist[len(mlist)-1]),&mlist,conndic)
+			go newchatter(message{author : member{nick:"SERVR"}, text : "SERVER MESSAGE : a new member has joined the chat : "+mlist[len(mlist)-1].nick+"\n", timestamp : time.Now().Format("03:04:05")},*(mlist[len(mlist)-1]),&mlist,conndic)
 			go getfrom(commchan, conn, conndic)
 		}
 	}
